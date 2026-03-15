@@ -1,79 +1,34 @@
-/**
- * ClinicalNoteDisplay.jsx
- * =======================
- * Renders the AI-generated ClinicalNote in a formatted, printable card.
- * Each of the 5 clinical sections has its own colour-coded chip + icon.
- *
- * Features:
- *  - Patient metadata chips (name, date)
- *  - Copy-to-clipboard button
- *  - Generate another note button
- *  - Collapsible audio transcription accordion
- *  - Staggered section reveal via animationDelay (dynamic — must use inline style)
- */
-
 import React, { useState } from 'react'
 import {
-  CheckCircle, User, Calendar, ClipboardCopy, RotateCcw,
+  CheckCircle, User, Calendar, Copy, RotateCcw,
   Thermometer, Stethoscope, Pill, ClipboardList, CalendarClock,
   ChevronDown, ChevronUp, Mic,
 } from 'lucide-react'
 
-// Each section maps to a colour scheme.
-// Tailwind v4: all colour utilities come from @theme tokens in index.css.
 const SECTIONS = [
-  {
-    key: 'patient_symptoms', label: 'Patient Symptoms', Icon: Thermometer,
-    chip: 'bg-orange-50 border-orange-200', labelCls: 'text-orange-600',
-    iconBg: 'bg-orange-100', iconColor: 'text-orange-500',
-  },
-  {
-    key: 'diagnosis', label: 'Diagnosis', Icon: Stethoscope,
-    chip: 'bg-violet-50 border-violet-200', labelCls: 'text-violet-600',
-    iconBg: 'bg-violet-100', iconColor: 'text-violet-500',
-  },
-  {
-    key: 'treatment_plan', label: 'Treatment Plan', Icon: ClipboardList,
-    chip: 'bg-sky-50 border-sky-200', labelCls: 'text-sky-600',
-    iconBg: 'bg-sky-100', iconColor: 'text-sky-500',
-  },
-  {
-    key: 'medications', label: 'Medications', Icon: Pill,
-    chip: 'bg-emerald-50 border-emerald-200', labelCls: 'text-emerald-600',
-    iconBg: 'bg-emerald-100', iconColor: 'text-emerald-500',
-  },
-  {
-    key: 'follow_up', label: 'Follow-up Instructions', Icon: CalendarClock,
-    chip: 'bg-amber-50 border-amber-200', labelCls: 'text-amber-600',
-    iconBg: 'bg-amber-100', iconColor: 'text-amber-500',
-  },
+  { key: 'patient_symptoms', label: 'Patient Symptoms',      Icon: Thermometer,   chip: 'bg-orange-50 border-orange-200',  chipText: 'text-orange-700',  iconBox: 'bg-orange-100 text-orange-500'  },
+  { key: 'diagnosis',        label: 'Diagnosis',             Icon: Stethoscope,   chip: 'bg-violet-50 border-violet-200',  chipText: 'text-violet-700',  iconBox: 'bg-violet-100 text-violet-500'  },
+  { key: 'treatment_plan',   label: 'Treatment Plan',        Icon: ClipboardList, chip: 'bg-sky-50 border-sky-200',        chipText: 'text-sky-700',     iconBox: 'bg-sky-100 text-sky-500'        },
+  { key: 'medications',      label: 'Medications',           Icon: Pill,          chip: 'bg-emerald-50 border-emerald-200', chipText: 'text-emerald-700', iconBox: 'bg-emerald-100 text-emerald-500' },
+  { key: 'follow_up',        label: 'Follow-up Instructions',Icon: CalendarClock, chip: 'bg-amber-50 border-amber-200',    chipText: 'text-amber-700',   iconBox: 'bg-amber-100 text-amber-500'    },
 ]
 
+function buildPlainText(note, patient_name, visit_date) {
+  const lines = ['CLINICAL NOTE']
+  if (patient_name) lines.push(`Patient: ${patient_name}`)
+  if (visit_date)   lines.push(`Date: ${visit_date}`)
+  lines.push('')
+  SECTIONS.forEach(({ key, label }) => { lines.push(`${label}:`, note[key], '') })
+  return lines.join('\n')
+}
+
 export default function ClinicalNoteDisplay({ result, onReset }) {
-  const { clinical_note, patient_name, visit_date, transcription } = result
+  const { clinical_note: note, patient_name, visit_date, transcription } = result
   const [copied, setCopied] = useState(false)
   const [showTx, setShowTx] = useState(false)
 
-  function buildPlainText() {
-    return [
-      'CLINICAL NOTE',
-      patient_name ? `Patient: ${patient_name}` : '',
-      visit_date   ? `Date: ${visit_date}`       : '',
-      '',
-      `Patient Symptoms:\n${clinical_note.patient_symptoms}`,
-      '',
-      `Diagnosis:\n${clinical_note.diagnosis}`,
-      '',
-      `Treatment Plan:\n${clinical_note.treatment_plan}`,
-      '',
-      `Medications:\n${clinical_note.medications}`,
-      '',
-      `Follow-up Instructions:\n${clinical_note.follow_up}`,
-    ].filter(Boolean).join('\n')
-  }
-
   function handleCopy() {
-    navigator.clipboard.writeText(buildPlainText())
+    navigator.clipboard.writeText(buildPlainText(note, patient_name, visit_date))
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
   }
@@ -83,97 +38,92 @@ export default function ClinicalNoteDisplay({ result, onReset }) {
 
       {/* Success banner */}
       <div className="flex items-center gap-2.5 px-4 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-        <CheckCircle size={17} className="text-emerald-500 shrink-0" />
+        <CheckCircle size={16} className="text-emerald-500 shrink-0" />
         <span className="text-emerald-700 text-sm font-medium">
-          Clinical note generated successfully
+          Note generated and saved to your records
         </span>
       </div>
 
       {/* Main card */}
       <div className="bg-white rounded-2xl shadow-card-lg border border-slate-100 overflow-hidden">
 
-        {/* Card header */}
-        <div className="flex items-start justify-between gap-4 px-7 py-6">
-          <div>
-            <h2 className="font-display text-2xl text-teal-900 mb-3">Clinical Note</h2>
-            <div className="flex flex-wrap gap-2">
-              {patient_name && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-600">
-                  <User size={11} /> {patient_name}
-                </span>
-              )}
-              {visit_date && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-600">
-                  <Calendar size={11} /> {visit_date}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-600">
-                <CheckCircle size={11} /> Gemini AI
-              </span>
+        {/* Card header
+            FIX: Was a single flex row with title+badges left and buttons right.
+            On narrow screens (320-375px) this overflowed. Now the title row and
+            action buttons are stacked vertically, each full-width on mobile,
+            side-by-side on sm+.                                                  */}
+        <div className="px-4 sm:px-7 py-4 sm:py-5 border-b border-slate-100">
+          {/* Top row: title + action buttons */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h2 className="font-display text-2xl sm:text-[1.65rem] text-brand-900 leading-tight">
+              Clinical Note
+            </h2>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg text-xs font-semibold text-brand-700 transition-colors cursor-pointer"
+              >
+                <Copy size={12} />
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+              <button
+                onClick={onReset}
+                className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
+              >
+                <RotateCcw size={12} />
+                New Note
+              </button>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg text-xs font-semibold text-teal-700 transition-colors cursor-pointer"
-            >
-              <ClipboardCopy size={13} />
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-            <button
-              onClick={onReset}
-              className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
-            >
-              <RotateCcw size={13} /> New Note
-            </button>
+          {/* Meta badges */}
+          <div className="flex flex-wrap gap-2">
+            {patient_name && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-600">
+                <User size={10} /> {patient_name}
+              </span>
+            )}
+            {visit_date && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-slate-600">
+                <Calendar size={10} /> {visit_date}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-semibold text-emerald-700">
+              <CheckCircle size={10} /> Gemini AI
+            </span>
           </div>
         </div>
 
-        <div className="h-px bg-slate-100" />
-
         {/* Clinical sections */}
-        <div className="px-7 py-6 flex flex-col gap-6">
-          {SECTIONS.map(({ key, label, Icon, chip, labelCls, iconBg, iconColor }, idx) => (
-            <div
-              key={key}
-              className="flex flex-col gap-2.5 animate-fade-up"
-              style={{ animationDelay: `${idx * 70}ms` }}   // dynamic — must be inline
-            >
-              {/* Section label chip */}
-              <div className={`inline-flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full w-fit border ${chip}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${iconBg}`}>
-                  <Icon size={13} className={iconColor} />
+        <div className="px-4 sm:px-7 py-5 sm:py-6 flex flex-col gap-5">
+          {SECTIONS.map(({ key, label, Icon, chip, chipText, iconBox }, idx) => (
+            <div key={key} className="animate-fade-up" style={{ animationDelay: `${idx * 60}ms` }}>
+              <div className={`inline-flex items-center gap-1.5 pl-1.5 pr-3 py-0.5 rounded-full border ${chip} mb-2.5`}>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${iconBox}`}>
+                  <Icon size={11} />
                 </div>
-                <span className={`text-[0.68rem] font-bold uppercase tracking-widest ${labelCls}`}>
+                <span className={`text-[0.64rem] font-bold uppercase tracking-wider ${chipText}`}>
                   {label}
                 </span>
               </div>
-
-              {/* Section value */}
-              <div className="pl-1">
-                {clinical_note[key] === 'Not mentioned.' ? (
-                  <p className="text-slate-400 text-sm italic">Not mentioned in the conversation.</p>
-                ) : (
-                  <p className="text-slate-700 text-[0.92rem] leading-relaxed whitespace-pre-wrap">
-                    {clinical_note[key]}
-                  </p>
-                )}
-              </div>
+              {note[key] === 'Not mentioned.' ? (
+                <p className="text-slate-400 text-sm italic pl-1">Not mentioned in the conversation.</p>
+              ) : (
+                <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap pl-1">{note[key]}</p>
+              )}
             </div>
           ))}
         </div>
 
-        {/* Transcription accordion (audio only) */}
+        {/* Audio transcription accordion */}
         {transcription && (
           <>
-            <div className="h-px bg-slate-100" />
-            <div className="px-7 py-4">
+            <div className="h-px bg-slate-100 mx-4 sm:mx-7" />
+            <div className="px-4 sm:px-7 py-4">
               <button
-                onClick={() => setShowTx(!showTx)}
+                onClick={() => setShowTx(v => !v)}
                 type="button"
-                className="flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800 transition-colors cursor-pointer"
+                className="flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800 transition-colors cursor-pointer"
               >
                 <Mic size={14} />
                 Audio Transcription
@@ -181,9 +131,7 @@ export default function ClinicalNoteDisplay({ result, onReset }) {
               </button>
               {showTx && (
                 <div className="mt-3 p-4 bg-slate-50 rounded-xl border border-slate-100 animate-fade-in">
-                  <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap">
-                    {transcription}
-                  </p>
+                  <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap font-mono">{transcription}</p>
                 </div>
               )}
             </div>
@@ -192,9 +140,9 @@ export default function ClinicalNoteDisplay({ result, onReset }) {
       </div>
 
       {/* Disclaimer */}
-      <p className="text-[0.72rem] text-slate-400 text-center leading-relaxed px-4">
+      <p className="text-xs text-slate-400 text-center px-4 leading-relaxed">
         ⚕ AI-generated for documentation assistance only.
-        Always review before use in official medical records.
+        Always verify before adding to official medical records.
       </p>
     </div>
   )

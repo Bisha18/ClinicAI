@@ -1,115 +1,137 @@
 """
-models/schemas.py
-=================
-Pydantic data models that define the shape of:
-  - API request bodies
-  - API response bodies
-  - Internal data passed between service layers
+app/models/schemas.py
+=====================
+Pydantic request / response schemas for all API endpoints.
 
-Pydantic automatically validates incoming JSON and raises
-clear HTTP 422 errors when data doesn't match the schema.
+These are kept separate from the Beanie Document models in database.py.
+  • Document models  → MongoDB persistence layer
+  • Schemas          → API input validation + response serialisation
+
+Sections
+--------
+  Auth     →  signup, login, token response, user profile
+  Notes    →  conversation input, structured AI output
+  Records  →  list summary, full detail, dashboard stats
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
-from enum import Enum
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
+from datetime import datetime
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
+# =============================================================================
+# Auth Schemas
+# =============================================================================
 
-class InputMode(str, Enum):
-    """How the user provides the conversation."""
-    TEXT  = "text"   # User pastes raw text
-    AUDIO = "audio"  # User uploads audio file (transcribed by Whisper)
+class SignupRequest(BaseModel):
+    email:     EmailStr
+    full_name: str            = Field(..., min_length=2, max_length=100)
+    password:  str            = Field(..., min_length=8,
+                                       description="Minimum 8 characters")
+    specialty: Optional[str] = Field(None,
+                                      description="e.g. Cardiology, General Practice")
 
 
-# ---------------------------------------------------------------------------
-# Request Models
-# ---------------------------------------------------------------------------
+class LoginRequest(BaseModel):
+    email:    EmailStr
+    password: str
+
+
+class UserProfile(BaseModel):
+    id:         str
+    email:      str
+    full_name:  str
+    specialty:  Optional[str]
+    created_at: datetime
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type:   str = "bearer"
+    user:         UserProfile
+
+
+# =============================================================================
+# Clinical Note Schemas
+# =============================================================================
 
 class ConversationRequest(BaseModel):
-    """
-    Request body for POST /generate-notes (text mode).
+    """Request body for POST /api/notes/generate."""
+    conversation: str            = Field(..., min_length=20,
+                                          description="Raw doctor-patient conversation text")
+    patient_name: Optional[str] = None
+    visit_date:   Optional[str] = None
 
-    Fields
-    ------
-    conversation : str
-        The raw doctor-patient dialogue as plain text.
-    patient_name : str | None
-        Optional patient identifier for the note header.
-    visit_date : str | None
-        Optional visit date string (e.g. "2025-01-15").
-    """
-    conversation: str = Field(
-        ...,
-        min_length=20,
-        description="Full doctor-patient conversation text",
-        example=(
-            "Doctor: Good morning. What brings you in today?\n"
-            "Patient: I've had a persistent cough for two weeks, "
-            "some fever, and chest tightness.\n"
-            "Doctor: Any shortness of breath? Did you measure the fever?\n"
-            "Patient: Yes, around 38.5°C. Breathing feels a bit labored.\n"
-            "Doctor: I'll prescribe amoxicillin 500mg twice daily for 7 days "
-            "and suggest a chest X-ray. Come back in two weeks."
-        ),
-    )
-    patient_name: Optional[str] = Field(None, description="Patient's name (optional)")
-    visit_date:   Optional[str] = Field(None, description="Date of visit (optional)")
-
-
-# ---------------------------------------------------------------------------
-# Response Models
-# ---------------------------------------------------------------------------
 
 class ClinicalNote(BaseModel):
-    """
-    Structured clinical note extracted by the AI.
-
-    Every field maps to a standard section in a medical SOAP note
-    (Subjective, Objective, Assessment, Plan).
-    """
-    patient_symptoms: str   = Field(..., description="Reported symptoms / chief complaint")
-    diagnosis:        str   = Field(..., description="Probable or confirmed diagnosis")
-    treatment_plan:   str   = Field(..., description="Recommended treatment and procedures")
-    medications:      str   = Field(..., description="Prescribed medications, dosage, frequency")
-    follow_up:        str   = Field(..., description="Follow-up instructions and timeline")
+    """Structured output extracted by the Gemini AI pipeline."""
+    patient_symptoms: str
+    diagnosis:        str
+    treatment_plan:   str
+    medications:      str
+    follow_up:        str
 
 
 class GenerateNotesResponse(BaseModel):
-    """
-    Full API response returned from POST /generate-notes.
-
-    Fields
-    ------
-    success : bool
-        True if notes were generated without errors.
-    clinical_note : ClinicalNote | None
-        The structured note (None only when success=False).
-    raw_text : str
-        The verbatim LLM output before parsing — useful for debugging.
-    patient_name : str | None
-        Echo back the patient name if provided.
-    visit_date : str | None
-        Echo back the visit date if provided.
-    transcription : str | None
-        The Whisper transcription (only present for audio uploads).
-    error : str | None
-        Error message when success=False.
-    """
-    success:       bool              = True
+    success:       bool                    = True
     clinical_note: Optional[ClinicalNote] = None
-    raw_text:      str               = ""
-    patient_name:  Optional[str]     = None
-    visit_date:    Optional[str]     = None
-    transcription: Optional[str]     = None
-    error:         Optional[str]     = None
+    raw_text:      str                    = ""
+    patient_name:  Optional[str]          = None
+    visit_date:    Optional[str]          = None
+    transcription: Optional[str]          = None
+    record_id:     Optional[str]          = None   # MongoDB ObjectId of saved record
+    error:         Optional[str]          = None
 
 
 class TranscriptionResponse(BaseModel):
-    """Response from POST /transcribe — standalone audio-to-text endpoint."""
     success:       bool          = True
     transcription: Optional[str] = None
     error:         Optional[str] = None
+
+
+# =============================================================================
+# Patient Record Schemas
+# =============================================================================
+
+class PatientRecordSummary(BaseModel):
+    """Compact representation used in list views and the dashboard."""
+    id:               str
+    patient_name:     Optional[str]
+    visit_date:       Optional[str]
+    diagnosis:        str
+    patient_symptoms: str
+    input_mode:       str
+    created_at:       datetime
+
+
+class PatientRecordDetail(BaseModel):
+    """Full record returned by GET /api/records/{id}."""
+    id:               str
+    patient_name:     Optional[str]
+    visit_date:       Optional[str]
+    conversation:     str
+    transcription:    Optional[str]
+    input_mode:       str
+    patient_symptoms: str
+    diagnosis:        str
+    treatment_plan:   str
+    medications:      str
+    follow_up:        str
+    gemini_model:     Optional[str]
+    created_at:       datetime
+    updated_at:       datetime
+
+
+class RecordsListResponse(BaseModel):
+    records: List[PatientRecordSummary]
+    total:   int
+    page:    int
+    limit:   int
+
+
+class DashboardStats(BaseModel):
+    total_records:  int
+    this_week:      int
+    this_month:     int
+    recent_records: List[PatientRecordSummary]
+    top_diagnoses:  List[dict]

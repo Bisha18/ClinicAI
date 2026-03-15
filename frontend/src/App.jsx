@@ -1,105 +1,89 @@
-/**
- * App.jsx
- * =======
- * Root component. Manages top-level layout and drives state transitions:
- *
- *   idle    → <ConversationInput>
- *   loading → <LoadingState>
- *   success → <ClinicalNoteDisplay>
- *   error   → <ErrorState>
- *
- * All async logic lives in the useClinicalNotes hook — this component
- * is purely responsible for layout and rendering the right child.
- */
-
 import React, { useState } from 'react'
-import Header               from './components/Header'
-import ConversationInput    from './components/ConversationInput'
-import LoadingState         from './components/LoadingState'
-import ClinicalNoteDisplay  from './components/ClinicalNoteDisplay'
-import ErrorState           from './components/ErrorState'
-import { useClinicalNotes } from './hooks/useClinicalNotes'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider }     from './context/AuthContext'
+import ProtectedRoute       from './components/ProtectedRoute'
+import Sidebar              from './components/Sidebar'
+import LoginPage            from './pages/LoginPage'
+import SignupPage           from './pages/SignupPage'
+import DashboardPage        from './pages/DashboardPage'
+import GeneratePage         from './pages/GeneratePage'
+import RecordsPage          from './pages/RecordsPage'
+import RecordDetailPage     from './pages/RecordDetailPage'
+import { Menu }             from 'lucide-react'
+import { Activity }         from 'lucide-react'
 
-export default function App() {
-  const {
-    isIdle, isLoading, isSuccess, isError,
-    result, error, uploadProgress,
-    generateFromText, generateFromAudio, reset,
-  } = useClinicalNotes()
-
-  const [lastMode, setLastMode] = useState('text')
-
-  const handleText  = p => { setLastMode('text');  generateFromText(p)  }
-  const handleAudio = p => { setLastMode('audio'); generateFromAudio(p) }
+function Layout({ children }) {
+  const [open, setOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Header />
+    <div className="flex min-h-screen bg-slate-50">
 
-      <main className="max-w-3xl mx-auto px-6 py-10 pb-24">
+      {/* ── Dark overlay (mobile only) ─────────────────────── */}
+      <div
+        className={
+          'fixed inset-0 z-30 bg-black/50 transition-opacity duration-300 md:hidden ' +
+          (open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none')
+        }
+        onClick={() => setOpen(false)}
+      />
 
-        {/* Hero — shown only on idle */}
-        {isIdle && (
-          <div className="text-center mb-8 animate-fade-up">
+      {/* ── Sidebar ───────────────────────────────────────────
+          Mobile : fixed drawer, slides in from left
+          md+    : static column, always visible              */}
+      <div className={
+        'fixed inset-y-0 left-0 z-40 flex-shrink-0 ' +
+        'transition-transform duration-300 ease-in-out ' +
+        'md:static md:translate-x-0 md:z-auto ' +
+        (open ? 'translate-x-0' : '-translate-x-full')
+      }>
+        <Sidebar onClose={() => setOpen(false)} />
+      </div>
 
-            {/* Tech badge */}
-            <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-full px-4 py-1.5 mb-6">
-              <span className="w-2 h-2 rounded-full bg-teal-500 shrink-0 animate-pulse-dot" />
-              <span className="text-teal-700 text-[0.72rem] font-semibold tracking-wide">
-                Gemini 1.5 Flash · LangChain · FastAPI · Tailwind v4
-              </span>
-            </div>
+      {/* ── Page body ─────────────────────────────────────────
+          pt-14 clears the mobile topbar height (h-14).
+          On md+ the topbar is hidden so pt-0 resets it.     */}
+      <div className="flex-1 min-w-0 flex flex-col pt-14 md:pt-0">
 
-            <h1 className="font-display text-5xl text-teal-900 leading-[1.12] mb-4">
-              Turn Consultations Into<br />
-              <em className="italic text-teal-600">Clinical Notes Instantly</em>
-            </h1>
+        {/* Mobile topbar — hidden on md+ */}
+        <header className="fixed top-0 left-0 right-0 z-20 h-14 flex items-center gap-3 px-4 bg-brand-900 border-b border-brand-700/30 md:hidden">
+          <button
+            onClick={() => setOpen(true)}
+            aria-label="Open menu"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-brand-300 hover:bg-brand-700/40 transition-colors shrink-0"
+          >
+            <Menu size={20} />
+          </button>
+          <Activity size={18} className="text-brand-400 shrink-0" />
+          <span className="font-display text-white text-lg leading-none">ClinicalAI</span>
+        </header>
 
-            <p className="text-slate-500 text-base leading-relaxed max-w-lg mx-auto">
-              Paste or record a doctor-patient conversation and receive a
-              complete, structured clinical note in seconds.
-            </p>
-          </div>
-        )}
-
-        {/* Feature chips — idle only */}
-        {isIdle && (
-          <div className="flex flex-wrap justify-center gap-2 mb-8">
-            {['Symptoms', 'Diagnosis', 'Treatment Plan', 'Medications', 'Follow-up'].map(c => (
-              <span
-                key={c}
-                className="px-4 py-1.5 bg-white border border-teal-200 rounded-full text-[0.75rem] font-semibold text-teal-700"
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Dynamic content area */}
-        {isIdle    && (
-          <ConversationInput
-            onSubmitText={handleText}
-            onSubmitAudio={handleAudio}
-            isLoading={false}
-          />
-        )}
-        {isLoading && (
-          <LoadingState uploadProgress={uploadProgress} isAudio={lastMode === 'audio'} />
-        )}
-        {isSuccess && result && (
-          <ClinicalNoteDisplay result={result} onReset={reset} />
-        )}
-        {isError && (
-          <ErrorState error={error} onRetry={reset} />
-        )}
-
-        {/* Footer */}
-        <footer className="mt-16 text-center text-[0.72rem] text-slate-400">
-          FastAPI · LangChain · Google Gemini · React ·{' '}
-          <span className="text-teal-500 font-medium">Tailwind CSS v4</span>
-        </footer>
-      </main>
+        {/* Scrollable content area */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
     </div>
+  )
+}
+
+function Guard({ children }) {
+  return <ProtectedRoute><Layout>{children}</Layout></ProtectedRoute>
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login"       element={<LoginPage  />} />
+          <Route path="/signup"      element={<SignupPage />} />
+          <Route path="/dashboard"   element={<Guard><DashboardPage    /></Guard>} />
+          <Route path="/generate"    element={<Guard><GeneratePage     /></Guard>} />
+          <Route path="/records"     element={<Guard><RecordsPage      /></Guard>} />
+          <Route path="/records/:id" element={<Guard><RecordDetailPage /></Guard>} />
+          <Route path="*"            element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }

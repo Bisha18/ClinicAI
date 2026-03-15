@@ -1,118 +1,65 @@
-/*
- * index.css — Tailwind v4 entry point
- * =====================================
- * Tailwind v4 is CSS-first. Everything that was in tailwind.config.js
- * (custom colors, fonts, animations, shadows) now lives here inside
- * @theme {}. No config file needed.
- *
- * @import "tailwindcss"  →  replaces the three @tailwind directives from v3
- * @theme {}              →  defines design tokens as CSS variables
- * @layer base {}         →  global base styles
- * @utility {}            →  custom one-off utility classes
- */
-
 @import "tailwindcss";
-@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=DM+Serif+Display:ital@0;1&display=swap");
 
-/* ─── Design Tokens ───────────────────────────────────────────────────── */
 @theme {
-  /* Custom teal palette (extends Tailwind's built-in teal) */
-  --color-teal-50:  #edfaf9;
-  --color-teal-100: #d4f4f2;
-  --color-teal-200: #a9e9e5;
-  --color-teal-300: #72d4cd;
-  --color-teal-400: #3bbcb3;
-  --color-teal-500: #269e96;
-  --color-teal-600: #20857e;
-  --color-teal-700: #1a6b65;
-  --color-teal-800: #145450;
-  --color-teal-900: #0d3d3a;
+  /* Brand palette — teal */
+  --color-brand-50:  #edfaf9;
+  --color-brand-100: #d0f4f1;
+  --color-brand-200: #a2e9e4;
+  --color-brand-300: #5fd6ce;
+  --color-brand-400: #29bdb5;
+  --color-brand-500: #18a09a;
+  --color-brand-600: #14857f;
+  --color-brand-700: #116a65;
+  --color-brand-800: #0d504c;
+  --color-brand-900: #093834;
 
   /* Typography */
+  --font-sans:    "Inter", system-ui, -apple-system, sans-serif;
   --font-display: "DM Serif Display", Georgia, serif;
-  --font-sans:    "DM Sans", system-ui, sans-serif;
 
-  /* Custom shadows */
-  --shadow-card:    0 4px 24px color-mix(in srgb, var(--color-teal-900) 8%, transparent);
-  --shadow-card-lg: 0 8px 40px color-mix(in srgb, var(--color-teal-900) 12%, transparent);
+  /* Shadows */
+  --shadow-card:    0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(9,56,52,0.08);
+  --shadow-card-lg: 0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(9,56,52,0.12);
+  --shadow-auth:    0 8px 48px rgba(9,56,52,0.22);
 
-  /* Custom animations */
-  --animate-fade-up:   fadeUp 0.45s ease both;
-  --animate-fade-in:   fadeIn 0.3s ease both;
-  --animate-pulse-dot: pulseDot 2s ease-in-out infinite;
-  --animate-spin-ring: spin 1s linear infinite;
+  /* Animations */
+  --animate-fade-in:   fadeIn   0.2s ease both;
+  --animate-fade-up:   fadeUp   0.35s ease both;
+  --animate-spin:      spin     0.75s linear infinite;
+  --animate-pulse-dot: pulseDot 1.8s  ease-in-out infinite;
 
-  /* Keyframes */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes pulseDot {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.35; }
-  }
+  @keyframes fadeIn   { from { opacity: 0; }                              to { opacity: 1; } }
+  @keyframes fadeUp   { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulseDot { 0%, 100% { opacity: 1; }  50% { opacity: 0.25; } }
 }
 
-/* ─── Base Styles ─────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
-
-  html { scroll-behavior: smooth; }
-
-  body {
+  html  { scroll-behavior: smooth; }
+  body  {
     font-family: var(--font-sans);
-    background-color: var(--color-slate-50);
-    color: var(--color-slate-900);
+    background-color: #f8fafc;
+    color: #0f172a;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-
-  ::-webkit-scrollbar        { width: 6px; }
-  ::-webkit-scrollbar-track  { background: var(--color-slate-100); }
-  ::-webkit-scrollbar-thumb  { background: var(--color-teal-300); border-radius: 3px; }
-
   :focus-visible {
-    outline: 2px solid var(--color-teal-400);
+    outline: 2px solid var(--color-brand-400);
     outline-offset: 2px;
   }
-
-  /* Make date input match other inputs on all browsers */
-  input[type="date"]::-webkit-calendar-picker-indicator {
-    opacity: 0.5;
-    cursor: pointer;
-  }
+  ::-webkit-scrollbar        { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track  { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-brand-400); }
 }
 
-/* ─── Custom Utilities ────────────────────────────────────────────────── */
-/* In v4, one-off utilities that can't be expressed with existing classes  */
-@utility font-display {
-  font-family: var(--font-display);
-}
-
-@utility shadow-card {
-  box-shadow: var(--shadow-card);
-}
-
-@utility shadow-card-lg {
-  box-shadow: var(--shadow-card-lg);
-}
-
-@utility animate-fade-up {
-  animation: var(--animate-fade-up);
-}
-
-@utility animate-fade-in {
-  animation: var(--animate-fade-in);
-}
-
-@utility animate-pulse-dot {
-  animation: var(--animate-pulse-dot);
-}
-
-@utility animate-spin-ring {
-  animation: var(--animate-spin-ring);
-}
+/* Custom utility classes */
+@utility font-display      { font-family: var(--font-display); }
+@utility shadow-card       { box-shadow: var(--shadow-card); }
+@utility shadow-card-lg    { box-shadow: var(--shadow-card-lg); }
+@utility shadow-auth       { box-shadow: var(--shadow-auth); }
+@utility animate-fade-in   { animation: var(--animate-fade-in); }
+@utility animate-fade-up   { animation: var(--animate-fade-up); }
+@utility animate-spin      { animation: var(--animate-spin); }
+@utility animate-pulse-dot { animation: var(--animate-pulse-dot); }

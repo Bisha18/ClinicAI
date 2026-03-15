@@ -1,14 +1,9 @@
 /**
  * ConversationInput.jsx
  * =====================
- * Two-tab input panel:
- *   Tab 1 — Paste conversation text
- *   Tab 2 — Upload audio file (transcribed by Gemini's multimodal API)
- *
- * Tailwind v4 notes:
- *  - Dynamic classes (e.g. conditional border colours) use template literals
- *  - `data-[state]` variants aren't needed here; we use conditional className strings
- *  - All colour tokens come from the @theme block in index.css
+ * Mobile fix: patient metadata grid-cols-2 → grid-cols-1 sm:grid-cols-2
+ * so inputs aren't too narrow on phones.
+ * All other logic unchanged.
  */
 
 import React, { useState, useRef } from 'react'
@@ -29,7 +24,6 @@ Doctor: This looks like a migraine with aura. I'm prescribing sumatriptan 50mg �
 Patient: Should I continue the ibuprofen?
 Doctor: Use it as a backup if sumatriptan isn't available, but try sumatriptan first to avoid rebound headaches.`
 
-// Shared input field styles
 const INPUT =
   'w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 ' +
   'bg-slate-50 placeholder-slate-400 font-sans ' +
@@ -73,18 +67,18 @@ export default function ConversationInput({ onSubmitText, onSubmitAudio, isLoadi
         'shadow-lg shadow-teal-700/20 hover:shadow-teal-600/25 active:scale-[0.98] cursor-pointer')
 
   return (
-    <div className="bg-white rounded-2xl shadow-card border border-slate-100 p-8">
+    <div className="bg-white rounded-2xl shadow-card border border-slate-100 p-5 sm:p-8">
 
       {/* Card header */}
       <div className="mb-6">
-        <h2 className="font-display text-2xl text-teal-900 mb-1.5">New Consultation</h2>
+        <h2 className="font-display text-xl sm:text-2xl text-teal-900 mb-1.5">New Consultation</h2>
         <p className="text-slate-500 text-sm leading-relaxed">
           Paste the conversation or upload an audio recording to generate structured clinical notes.
         </p>
       </div>
 
-      {/* Patient metadata */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      {/* Patient metadata — 1 col on mobile, 2 cols on sm+ */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="flex flex-col gap-1.5">
           <label className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-slate-600 uppercase tracking-wide">
             <User size={11} /> Patient Name
@@ -126,12 +120,12 @@ export default function ConversationInput({ onSubmitText, onSubmitAudio, isLoadi
         ))}
       </div>
 
-      {/* ── Text tab ─────────────────────────────────────────────────── */}
+      {/* ── Text tab ─────────────────────────────────────────── */}
       {tab === 'text' && (
         <form onSubmit={handleTextSubmit}>
           <div className="mb-4 border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
             <textarea
-              className="w-full px-4 py-4 bg-transparent border-none resize-y text-sm leading-relaxed text-slate-900 placeholder-slate-400 focus:outline-none min-h-56 font-sans"
+              className="w-full px-4 py-4 bg-transparent border-none resize-y text-sm leading-relaxed text-slate-900 placeholder-slate-400 focus:outline-none min-h-48 sm:min-h-56 font-sans"
               placeholder={"Paste the doctor-patient conversation here…\n\nDoctor: Good morning, what brings you in today?\nPatient: I've been having chest pain…"}
               value={conversation}
               onChange={e => setConversation(e.target.value)}
@@ -145,7 +139,7 @@ export default function ConversationInput({ onSubmitText, onSubmitAudio, isLoadi
                 className="text-[0.72rem] font-medium text-teal-600 underline decoration-dotted hover:text-teal-700 transition-colors cursor-pointer"
                 onClick={() => setConversation(SAMPLE)}
               >
-                Load sample conversation
+                Load sample
               </button>
             </div>
           </div>
@@ -164,18 +158,16 @@ export default function ConversationInput({ onSubmitText, onSubmitAudio, isLoadi
         </form>
       )}
 
-      {/* ── Audio tab ─────────────────────────────────────────────────── */}
+      {/* ── Audio tab ─────────────────────────────────────────── */}
       {tab === 'audio' && (
         <form onSubmit={handleAudioSubmit}>
-
-          {/* Drop zone */}
           <div
             onClick={() => !audioFile && fileRef.current?.click()}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={onDrop}
             className={
-              'mb-3 border-2 border-dashed rounded-xl p-9 text-center transition-all duration-200 ' +
+              'mb-3 border-2 border-dashed rounded-xl p-6 sm:p-9 text-center transition-all duration-200 ' +
               (audioFile
                 ? 'border-teal-300 bg-teal-50 cursor-default'
                 : dragOver
@@ -215,7 +207,6 @@ export default function ConversationInput({ onSubmitText, onSubmitAudio, isLoadi
             )}
           </div>
 
-          {/* Info note */}
           <div className="flex items-start gap-2 text-[0.75rem] text-slate-500 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2.5 mb-4">
             <AlertCircle size={13} className="text-teal-600 mt-px shrink-0" />
             <span>

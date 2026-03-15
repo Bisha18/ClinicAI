@@ -1,95 +1,70 @@
 /**
- * utils/api.js
- * ============
- * Centralised API layer — every call to the FastAPI backend goes
- * through this file.
+ * src/utils/api.js
+ * ─────────────────
+ * Axios instance with:
+ *   • Auto Bearer token injection from localStorage
+ *   • FastAPI error message normalisation
  *
- * In development, Vite's proxy forwards /api → http://localhost:8000
- * In production, set VITE_API_BASE_URL in your .env file
+ * All API calls are exported as named functions so components
+ * never touch axios or fetch directly.
  */
-
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const BASE = import.meta.env.VITE_API_BASE_URL || ''
 
-const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 120_000,  // 2 min — Gemini calls can take time
-})
+export const api = axios.create({ baseURL: BASE, timeout: 120000 })
 
-// Log outgoing requests in development
+// Attach JWT on every outgoing request
 api.interceptors.request.use(config => {
-  if (import.meta.env.DEV) {
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
-  }
+  const token = localStorage.getItem('token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Normalise error messages from FastAPI's detail field
+// Flatten FastAPI validation / detail errors into a single string
 api.interceptors.response.use(
   res => res,
   err => {
-    const message =
-      err.response?.data?.detail ||
-      err.response?.data?.message ||
-      err.message ||
-      'An unknown error occurred'
-    return Promise.reject(new Error(message))
+    const raw = err.response?.data?.detail || err.message || 'Unknown error'
+    const msg = Array.isArray(raw) ? raw.map(e => e.msg).join(', ') : String(raw)
+    return Promise.reject(new Error(msg))
   }
 )
 
-/**
- * Generate clinical notes from pasted conversation text.
- * POST /api/generate-notes
- */
-export async function generateNotesFromText({ conversation, patientName, visitDate }) {
-  const { data } = await api.post('/api/generate-notes', {
+// ── Auth ─────────────────────────────────────────────────────
+export const signup = body => api.post('/api/auth/signup', body).then(r => r.data)
+export const login  = body => api.post('/api/auth/login',  body).then(r => r.data)
+export const getMe  = ()   => api.get('/api/auth/me').then(r => r.data)
+
+// ── Note generation ──────────────────────────────────────────
+export const generateFromText = ({ conversation, patientName, visitDate }) =>
+  api.post('/api/notes/generate', {
     conversation,
     patient_name: patientName || null,
     visit_date:   visitDate   || null,
-  })
-  return data
-}
+  }).then(r => r.data)
 
-/**
- * Generate clinical notes from an uploaded audio file.
- * POST /api/generate-notes/audio  (multipart/form-data)
- */
-export async function generateNotesFromAudio({ audioFile, patientName, visitDate, onProgress }) {
-  const form = new FormData()
-  form.append('audio_file', audioFile)
-  if (patientName) form.append('patient_name', patientName)
-  if (visitDate)   form.append('visit_date',   visitDate)
-
-  const { data } = await api.post('/api/generate-notes/audio', form, {
+export const generateFromAudio = ({ audioFile, patientName, visitDate, onProgress }) => {
+  const fd = new FormData()
+  fd.append('audio_file', audioFile)
+  if (patientName) fd.append('patient_name', patientName)
+  if (visitDate)   fd.append('visit_date',   visitDate)
+  return api.post('/api/notes/generate/audio', fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    onUploadProgress: event => {
-      if (onProgress && event.total) {
-        onProgress(Math.round((event.loaded / event.total) * 100))
-      }
+    onUploadProgress: e => {
+      if (onProgress && e.total) onProgress(Math.round(e.loaded / e.total * 100))
     },
-  })
-  return data
+  }).then(r => r.data)
 }
 
-/**
- * Transcribe audio without generating a note.
- * POST /api/transcribe
- */
-export async function transcribeAudio(audioFile) {
-  const form = new FormData()
-  form.append('audio_file', audioFile)
-  const { data } = await api.post('/api/transcribe', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return data
-}
+// ── Records ──────────────────────────────────────────────────
+export const getDashboard = () =>
+  api.get('/api/records/dashboard').then(r => r.data)
 
-/**
- * Semantic search over stored notes.
- * GET /api/search-notes?query=...&k=5
- */
-export async function searchNotes(query, k = 5) {
-  const { data } = await api.get('/api/search-notes', { params: { query, k } })
-  return data
-}
+export const getRecords = (page = 1, limit = 10, search = '') =>
+  api.get('/api/records', {
+    params: { page, limit, search: search || undefined },
+  }).then(r => r.data)
+
+export const getRecord    = id => api.get(`/api/records/${id}`).then(r => r.data)
+export const deleteRecord = id => api.delete(`/api/records/${id}`)

@@ -1,35 +1,64 @@
-# ============================================================
-# AI Clinical Notes Generator — Python Dependencies
-# ============================================================
-# Install: pip install -r requirements.txt
-# ============================================================
+# =============================================================================
+# AI Clinical Notes Generator — Python Dependencies (March 2026)
+# =============================================================================
 
 # --- Web Framework ---
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
-python-multipart==0.0.12        # Required for UploadFile / form data
+fastapi==0.135.1                 # Latest stable (confirmed Mar 2026)
+uvicorn[standard]==0.41.0        # FIX: was 0.34.0 — latest is 0.41.0 (Feb 2026)
+python-multipart==0.0.20         # Required for audio file uploads
 
-# --- LangChain Core ---
-langchain==0.3.7
-langchain-core==0.3.15
-langchain-google-genai==2.0.4   # Gemini chat + embedding models
+# --- MongoDB (async) ---
+# FIX: beanie 2.0 is a BREAKING MAJOR VERSION — it drops Motor entirely in
+# favour of PyMongo's native async API (AsyncMongoClient).
+# database.py uses AsyncIOMotorClient from Motor; stay on beanie 1.x until
+# database.py is migrated. Pin to last 1.x release.
+beanie==1.29.0                   # Last stable 1.x; compatible with motor+pymongo below
+motor==3.7.0                     # Required by beanie 1.x (dropped in beanie 2.x)
+pymongo==4.11.0                  # Motor 3.x requires pymongo 4.x
 
-# --- Google Gemini SDK ---
-google-generativeai==0.8.3      # Direct SDK for multimodal (audio) transcription
+# --- AI / LangChain ---
+# FIX: The entire LangChain stack crossed a major version boundary.
+# langchain 0.3.x / langchain-core 0.3.x are INCOMPATIBLE with the current
+# 1.x series (latest: langchain==1.2.12, langchain-core==1.2.19, Mar 2026).
+# Mixing 0.3.x and 1.x packages causes ModuleNotFoundError at import time.
+# Pin consistently to the current 1.x series.
+langchain==1.2.12
+langchain-core==1.2.19
 
-# --- Environment Variables ---
+# FIX: langchain-google-genai 4.0+ is a BREAKING release — it replaces the
+# legacy google-generativeai SDK with the new consolidated google-genai SDK.
+# The old 2.0.10 pin is incompatible with langchain-core 1.x.
+# Pin to latest 4.x and replace google-generativeai with google-genai below.
+langchain-google-genai==4.1.2
+
+# FIX: google-generativeai is the LEGACY SDK, superseded by google-genai.
+# langchain-google-genai 4.x depends on google-genai, not google-generativeai.
+# Keeping both causes conflicts; remove google-generativeai and use google-genai.
+# transcription.py imports google.generativeai — update that import to:
+#   import google.genai as genai  (same pattern, new package name)
+google-genai>=1.0.0
+
+# FIX: langchain-community 0.3.x is incompatible with langchain-core 1.x.
+# Latest compatible release is 0.4.x.
+langchain-community==0.4.1
+
+# --- Authentication ---
+# FIX: python-jose has known CVEs (CVE-2024-33663 etc.). Replaced with PyJWT.
+PyJWT==2.9.0
+passlib[bcrypt]==1.7.4
+# FIX: passlib 1.7.4 + bcrypt >= 4.x raises AttributeError on bcrypt.__about__.
+bcrypt==4.0.1
+
+# --- Environment & Validation ---
 python-dotenv==1.0.1
+pydantic==2.12.5                 # FIX: bumped from 2.12.0 to latest stable patch
+pydantic-settings==2.13.1        # FIX: was 2.8.0 — langchain-community 0.4.1 requires >=2.10.1; latest is 2.13.1
+email-validator==2.2.0
 
-# --- Data Validation ---
-pydantic==2.9.2
-pydantic-settings==2.6.0
+# --- Optional: Vector Store (semantic search) ---
+faiss-cpu==1.10.0
 
-# --- Optional: Vector Store (uncomment to enable semantic search) ---
-# faiss-cpu==1.9.0
-# chromadb==0.5.20
-# langchain-community==0.3.5
-
-# --- Development / Testing ---
-httpx==0.28.0
-pytest==8.3.3
-pytest-asyncio==0.24.0
+# --- Dev / Testing ---
+httpx==0.28.1
+pytest==8.3.4
+pytest-asyncio==0.25.0

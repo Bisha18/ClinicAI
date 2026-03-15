@@ -1,52 +1,48 @@
+import { useState, useCallback } from 'react'
+import { generateFromText, generateFromAudio } from '../utils/api'
+
 /**
- * hooks/useClinicalNotes.js
- * =========================
- * Custom React hook — manages all state and async logic for
- * generating clinical notes. Keeps components purely presentational.
+ * useClinicalNotes
+ * ─────────────────
+ * State machine for the note-generation flow.
  *
- * State machine:
- *   idle → loading → success
- *                ↘ error
+ * States:  idle → loading → success
+ *                        ↘ error
+ *
+ * Returned:
+ *   isIdle / isLoading / isSuccess / isError
+ *   result, error, progress
+ *   genText(params), genAudio(params), reset()
  */
 
-import { useState, useCallback } from 'react'
-import { generateNotesFromText, generateNotesFromAudio } from '../utils/api'
-
-const INITIAL = {
-  status:         'idle',  // 'idle' | 'loading' | 'success' | 'error'
-  result:         null,
-  error:          null,
-  uploadProgress: 0,
-}
+const INIT = { status: 'idle', result: null, error: null, progress: 0 }
 
 export function useClinicalNotes() {
-  const [state, setState] = useState(INITIAL)
+  const [state, setState] = useState(INIT)
 
-  const setLoading = () =>
-    setState(s => ({ ...s, status: 'loading', error: null, uploadProgress: 0 }))
+  const reset = useCallback(() => setState(INIT), [])
 
-  const setSuccess = result =>
-    setState(s => ({ ...s, status: 'success', result, error: null }))
-
-  const setError = err =>
-    setState(s => ({ ...s, status: 'error', error: err.message || String(err) }))
-
-  const reset = useCallback(() => setState(INITIAL), [])
-
-  const generateFromText = useCallback(async params => {
-    setLoading()
-    try   { setSuccess(await generateNotesFromText(params)) }
-    catch (err) { setError(err) }
+  const genText = useCallback(async params => {
+    setState({ status: 'loading', result: null, error: null, progress: 0 })
+    try {
+      const result = await generateFromText(params)
+      setState({ status: 'success', result, error: null, progress: 0 })
+    } catch (err) {
+      setState({ status: 'error', result: null, error: err.message, progress: 0 })
+    }
   }, [])
 
-  const generateFromAudio = useCallback(async params => {
-    setLoading()
+  const genAudio = useCallback(async params => {
+    setState({ status: 'loading', result: null, error: null, progress: 0 })
     try {
-      setSuccess(await generateNotesFromAudio({
+      const result = await generateFromAudio({
         ...params,
-        onProgress: pct => setState(s => ({ ...s, uploadProgress: pct })),
-      }))
-    } catch (err) { setError(err) }
+        onProgress: p => setState(s => ({ ...s, progress: p })),
+      })
+      setState({ status: 'success', result, error: null, progress: 100 })
+    } catch (err) {
+      setState({ status: 'error', result: null, error: err.message, progress: 0 })
+    }
   }, [])
 
   return {
@@ -54,11 +50,11 @@ export function useClinicalNotes() {
     isLoading: state.status === 'loading',
     isSuccess: state.status === 'success',
     isError:   state.status === 'error',
-    result:         state.result,
-    error:          state.error,
-    uploadProgress: state.uploadProgress,
-    generateFromText,
-    generateFromAudio,
+    result:   state.result,
+    error:    state.error,
+    progress: state.progress,
+    genText,
+    genAudio,
     reset,
   }
 }

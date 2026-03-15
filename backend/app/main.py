@@ -1,73 +1,111 @@
 """
-AI Clinical Notes Generator - FastAPI Backend
-=============================================
-Main application entry point. Initializes the FastAPI app,
-registers routes, and configures CORS for the frontend.
+app/main.py
+===========
+FastAPI application entry point.
 
-Architecture:
-  main.py          → App bootstrap, CORS, route registration
-  routes/notes.py  → HTTP endpoint handlers
-  services/        → Business logic (AI pipeline, transcription)
-  models/          → Pydantic schemas for request/response
+Import order (no circular dependencies):
+  main.py
+    ├── app.models.database   (init_db)
+    ├── app.routes.auth       (router)
+    ├── app.routes.notes      (router)
+    └── app.routes.records    (router)
+
+Each route module imports from services, which import from models.
+Nothing imports back to main.py or routes from services.
+
+Windows + Python 3.12 note:
+  The ProactorEventLoop (Windows default) can conflict with some
+  asyncio operations. We set WindowsSelectorEventLoopPolicy on Windows
+  before uvicorn takes over.
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.routes import notes
-import uvicorn
+import sys
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 
-# ---------------------------------------------------------------------------
-# App Initialization
-# ---------------------------------------------------------------------------
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+# Windows Python 3.12+ fix — set before any async work
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from app.models.database import init_db
+
+# Import each route module directly (not via package __init__)
+from app.routes.auth    import router as auth_router
+from app.routes.notes   import router as notes_router
+from app.routes.records import router as records_router
+
+logging.basicConfig(
+    level   = logging.INFO,
+    format  = "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt = "%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Connect to MongoDB and initialise Beanie on startup."""
+    logger.info("Connecting to MongoDB…")
+    await init_db()
+    logger.info("MongoDB ready ✓")
+    yield
+    logger.info("Shutdown complete")
+
+
 app = FastAPI(
-    title="AI Clinical Notes Generator",
-    description="Converts doctor-patient conversations into structured clinical notes using LangChain + LLM",
-    version="1.0.0",
-    docs_url="/docs",      # Swagger UI at /docs
-    redoc_url="/redoc",    # ReDoc UI at /redoc
+    title       = "AI Clinical Notes Generator",
+    description = "Gemini-powered clinical documentation · MongoDB · JWT Auth",
+    version     = "3.0.0",
+    lifespan    = lifespan,
+    docs_url    = "/docs",
+    redoc_url   = "/redoc",
 )
 
-# ---------------------------------------------------------------------------
-# CORS Middleware
-# ---------------------------------------------------------------------------
-# Allow the React frontend (running on port 5173 via Vite or 3000 via CRA)
-# to communicate with this backend (running on port 8000).
+# FIX: CORS allowed origins should not be hardcoded for production.
+# Read from ALLOWED_ORIGINS env var (comma-separated).  Fall back to
+# localhost dev origins so local development still works out of the box.
+import os as _os
+_raw_origins = _os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
+)
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins     = _allowed_origins,
+    allow_credentials = True,
+    allow_methods     = ["*"],
+    allow_headers     = ["*"],
 )
 
-# ---------------------------------------------------------------------------
-# Route Registration
-# ---------------------------------------------------------------------------
-# All clinical-notes endpoints are prefixed with /api
-app.include_router(notes.router, prefix="/api", tags=["Clinical Notes"])
+# ── Global exception handler ──────────────────────────────────────────────────
+# Starlette's CORSMiddleware only attaches Access-Control-Allow-Origin to
+# responses it processes normally.  An unhandled exception that produces a
+# raw 500 bypasses the middleware's response processing, so the browser sees
+# no CORS header and reports a CORS error instead of the real error.
+# This handler catches every unhandled exception, logs it, and returns a
+# proper JSON 500 that the middleware CAN process — so CORS headers are always
+# present and the real error message reaches the frontend.
+@app.exception_handler(Exception)
+async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code = 500,
+        content     = {"detail": f"Internal server error: {exc}"},
+    )
+
+app.include_router(auth_router,    prefix="/api")
+app.include_router(notes_router,   prefix="/api")
+app.include_router(records_router, prefix="/api")
 
 
-# ---------------------------------------------------------------------------
-# Health Check
-# ---------------------------------------------------------------------------
 @app.get("/", tags=["Health"])
-async def root():
-    """Health check — confirms the API is running."""
-    return {
-        "status": "ok",
-        "message": "AI Clinical Notes Generator API is running",
-        "docs": "/docs",
-    }
-
-
-# ---------------------------------------------------------------------------
-# Dev Server Entry Point
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    # Run with: python -m app.main  (from /backend directory)
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/api/health", tags=["Health"])  # FIX: also expose under /api/health for reverse proxies
+async def health():
+    return {"status": "ok", "version": "3.0.0", "db": "mongodb"}
