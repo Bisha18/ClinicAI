@@ -14,7 +14,7 @@ export default defineConfig({
       // This means VITE_API_BASE_URL does NOT need to be set in .env —
       // axios uses '' (same-origin) and Vite proxies it to :8000.
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'https://clinicai-1.onrender.com',
         changeOrigin: true,
         secure: false,
       },
