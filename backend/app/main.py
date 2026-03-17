@@ -72,7 +72,7 @@ app = FastAPI(
 import os as _os
 _raw_origins = _os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
+    "*",
 )
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
